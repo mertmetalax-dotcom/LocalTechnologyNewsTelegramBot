@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI News Dashboard</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/style.css">
+
+    <script src="/socket.io/socket.io.js"></script>
+
+</head>
+
+<body>
+
+    <div class="layout">
+
+        <!-- SIDEBAR -->
+
+        <aside class="sidebar">
+
+            <div class="sidebar-top">
+
+                <div class="logo">
+
+                    <div class="logo-icon">
+                        🚀
+                    </div>
+
+                    <div>
+
+                        <h2>NewsBot</h2>
+
+                        <p>AI News System</p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="menu">
+
+                <button class="menu-item active">
+                    <span>📰</span>
+                    Haberler
+                </button>
+
+                <button class="menu-item">
+                    <span>📡</span>
+                    Kaynaklar
+                </button>
+
+                <button class="menu-item">
+                    <span>🤖</span>
+                    AI Filtre
+                </button>
+
+                <button class="menu-item">
+                    <span>⚙️</span>
+                    Ayarlar
+                </button>
+
+            </div>
+
+
+            <div class="sidebar-footer">
+
+                <div class="status-box">
+
+                    <div class="status-dot"></div>
+
+                    <span>
+                        Sistem Aktif
+                    </span>
+
+                </div>
+
+            </div>
+
+        </aside>
+
+
+        <!-- CONTENT -->
+
+        <main class="content">
+
+            <!-- TOPBAR -->
+
+            <div class="topbar">
+
+                <div class="topbar-left">
+
+                    <h1>
+                        Dashboard
+                    </h1>
+
+                    <p>
+                        Yapay zeka teknoloji haber yönetimi
+                    </p>
+
+                </div>
+
+
+                <button class="primary-btn" onclick="fetchNews()">
+
+                    Haberleri Çek
+
+                </button>
+
+            </div>
+
+
+            <!-- STATS -->
+
+            <div class="stats-grid">
+
+                <div class="stat-card">
+
+                    <div class="stat-icon">
+                        📄
+                    </div>
+
+                    <div>
+
+                        <h2 id="totalNews">
+                            0
+                        </h2>
+
+                        <p>
+                            Toplam Haber
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-icon">
+                        📡
+                    </div>
+
+                    <div>
+
+                        <h2 id="totalSources">
+                            0
+                        </h2>
+
+                        <p>
+                            Aktif Kaynak
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-icon">
+                        ⏱️
+                    </div>
+
+                    <div>
+
+                        <h2 id="lastRunTime">
+                            -
+                        </h2>
+
+                        <p>
+                            Son Çalışma
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- FEEDS -->
+
+            <section class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+
+                        <h2>
+                            RSS Kaynakları
+                        </h2>
+
+                        <p>
+                            Aktif RSS haber akışları
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="feed-form">
+
+                    <input type="text" id="feedInput" placeholder="https://example.com/feed">
+
+                    <button onclick="addFeed()">
+
+                        Kaynak Ekle
+
+                    </button>
+
+                </div>
+
+
+                <div id="feedsContainer" class="feeds-grid">
+
+                </div>
+
+            </section>
+
+
+            <!-- NEWS -->
+
+            <section class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+
+                        <h2>
+                            Son Haberler
+                        </h2>
+
+                        <p>
+                            Canlı AI haber akışı
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div id="newsContainer" class="news-grid">
+
+                </div>
+
+            </section>
+
+
+            <!-- LOGS -->
+
+            <section class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+
+                        <h2>
+                            Sistem Logları
+                        </h2>
+
+                        <p>
+                            Gerçek zamanlı sistem aktiviteleri
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div id="logsContainer" class="logs-container">
+
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
+
+
+    <script>
+
+        const socket = io();
+
+        let lastNewsCount = 0;
+
+        let loading = false;
+
+
+        /* =========================
+           SOCKET EVENTS
+        ========================= */
+
+        socket.on("connect", () => {
+
+            console.log("Socket bağlandı");
+        });
+
+
+        socket.on("disconnect", () => {
+
+            console.log("Socket bağlantı koptu");
+        });
+
+
+        socket.on("new-log", (log) => {
+
+            const container =
+                document.getElementById("logsContainer");
+
+            container.innerHTML =
+                `
+                <div class="log-item">
+                    ${log}
+                </div>
+                `
+                + container.innerHTML;
+        });
+
+
+        socket.on("news-added", async (news) => {
+
+            prependNews(news);
+
+            await loadStats();
+
+            showNotification(
+                "Yeni haber geldi 🚀"
+            );
+        });
+
+
+        /* =========================
+           CATEGORY COLOR
+        ========================= */
+
+        function getCategoryClass(category) {
+
+            switch (category) {
+
+                case "AI":
+                    return "cat-ai";
+
+                case "SOFTWARE":
+                    return "cat-software";
+
+                case "HARDWARE":
+                    return "cat-hardware";
+
+                case "MOBILE":
+                    return "cat-mobile";
+
+                case "GAMING":
+                    return "cat-gaming";
+
+                case "SECURITY":
+                    return "cat-security";
+
+                case "STARTUP":
+                    return "cat-startup";
+
+                default:
+                    return "cat-default";
+            }
+        }
+
+
+        /* =========================
+           NEWS CARD TEMPLATE
+        ========================= */
+
+        function createNewsCard(news) {
+
+            const images = [
+
+                "https://images.unsplash.com/photo-1677442136019-21780ecad995?q=80&w=1400&auto=format&fit=crop",
+
+                "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?q=80&w=1400&auto=format&fit=crop",
+
+                "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?q=80&w=1400&auto=format&fit=crop",
+
+                "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1400&auto=format&fit=crop",
+
+                "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1400&auto=format&fit=crop",
+
+                "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1400&auto=format&fit=crop"
+            ];
+
+            const image =
+                news.image ||
+                images[Math.floor(Math.random() * images.length)];
+
+            return `
+            <div class="news-card fade-in">
+
+                <img
+                    src="${image}"
+                    class="news-image"
+                    onerror="this.src='https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1400&auto=format&fit=crop'"
+                >
+
+                <div class="news-body">
+
+                    <div class="news-top">
+
+                        <span class="source">
+                            ${news.source || "Technology"}
+                        </span>
+
+                        <span class="category ${getCategoryClass(news.category)}">
+                            ${news.category || "TECH"}
+                        </span>
+
+                        <span class="date">
+                            ${news.created_at || ""}
+                        </span>
+
+                    </div>
+
+                    <a
+                        href="${news.link}"
+                        target="_blank"
+                    >
+                        ${news.title}
+                    </a>
+
+                    <p class="desc">
+                        ${news.description || ""}
+                    </p>
+
+                </div>
+
+            </div>
+            `;
+        }
+
+
+        /* =========================
+           PREPEND LIVE NEWS
+        ========================= */
+
+        function prependNews(news) {
+
+            const container =
+                document.getElementById("newsContainer");
+
+            const existing =
+                [...document.querySelectorAll(".news-card a")]
+                    .find(a => a.href === news.link);
+
+            if (existing) {
+
+                return;
+            }
+
+            container.innerHTML =
+                createNewsCard(news)
+                + container.innerHTML;
+        }
+
+
+        /* =========================
+           LOAD STATS
+        ========================= */
+
+        async function loadStats() {
+
+            try {
+
+                const response =
+                    await fetch("/api/news");
+
+                const data =
+                    await response.json();
+
+                if (!data.success) {
+
+                    return;
+                }
+
+                document.getElementById("totalNews")
+                    .innerText =
+                    data.stats.totalNews;
+
+                document.getElementById("totalSources")
+                    .innerText =
+                    data.stats.totalSources;
+
+                document.getElementById("lastRunTime")
+                    .innerText =
+                    data.stats.lastRunTime;
+
+            } catch (error) {
+
+                console.log(error);
+            }
+        }
+
+
+        /* =========================
+           LOAD NEWS
+        ========================= */
+
+        async function loadNews(showToast = false) {
+
+            if (loading) {
+
+                return;
+            }
+
+            loading = true;
+
+            try {
+
+                const response =
+                    await fetch("/api/news");
+
+                const data =
+                    await response.json();
+
+                if (!data.success) {
+
+                    showNotification(
+                        "API hatası oluştu"
+                    );
+
+                    return;
+                }
+
+                document.getElementById("totalNews")
+                    .innerText =
+                    data.stats.totalNews;
+
+                document.getElementById("totalSources")
+                    .innerText =
+                    data.stats.totalSources;
+
+                document.getElementById("lastRunTime")
+                    .innerText =
+                    data.stats.lastRunTime;
+
+                const container =
+                    document.getElementById("newsContainer");
+
+                container.innerHTML = "";
+
+                data.news.forEach(news => {
+
+                    container.innerHTML +=
+                        createNewsCard(news);
+                });
+
+                if (
+                    showToast &&
+                    data.news.length > lastNewsCount
+                ) {
+
+                    showNotification(
+                        "Yeni haberler geldi 🚀"
+                    );
+                }
+
+                lastNewsCount =
+                    data.news.length;
+
+            } catch (error) {
+
+                console.log(error);
+
+                showNotification(
+                    "Sunucu bağlantı hatası"
+                );
+
+            } finally {
+
+                loading = false;
+            }
+        }
+
+
+        /* =========================
+           LOAD FEEDS
+        ========================= */
+
+        async function loadFeeds() {
+
+            try {
+
+                const response =
+                    await fetch("/api/feeds");
+
+                const feeds =
+                    await response.json();
+
+                const container =
+                    document.getElementById("feedsContainer");
+
+                container.innerHTML = "";
+
+                feeds.forEach(feed => {
+
+                    container.innerHTML +=
+                        `
+                        <div class="feed-card">
+
+                            <div>
+
+                                <h3>
+                                    RSS Feed
+                                </h3>
+
+                                <span>
+                                    ${feed.url}
+                                </span>
+
+                            </div>
+
+                            <button
+                                class="danger-btn"
+                                onclick="deleteFeed(${feed.id})"
+                            >
+                                Sil
+                            </button>
+
+                        </div>
+                        `;
+                });
+
+            } catch (error) {
+
+                console.log(error);
+            }
+        }
+
+
+        /* =========================
+           LOAD LOGS
+        ========================= */
+
+        async function loadLogs() {
+
+            try {
+
+                const response =
+                    await fetch("/api/logs");
+
+                const logs =
+                    await response.json();
+
+                const container =
+                    document.getElementById("logsContainer");
+
+                container.innerHTML = "";
+
+                logs.forEach(log => {
+
+                    container.innerHTML +=
+                        `
+                        <div class="log-item">
+                            ${log}
+                        </div>
+                        `;
+                });
+
+            } catch (error) {
+
+                console.log(error);
+            }
+        }
+
+
+        /* =========================
+           ADD FEED
+        ========================= */
+
+        async function addFeed() {
+
+            const input =
+                document.getElementById("feedInput");
+
+            const url =
+                input.value.trim();
+
+            if (!url) {
+
+                showNotification(
+                    "URL giriniz"
+                );
+
+                return;
+            }
+
+            try {
+
+                await fetch("/api/feeds", {
+
+                    method: "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        url
+                    })
+                });
+
+                input.value = "";
+
+                showNotification(
+                    "Yeni RSS kaynağı eklendi"
+                );
+
+                loadFeeds();
+
+            } catch (error) {
+
+                console.log(error);
+            }
+        }
+
+
+        /* =========================
+           DELETE FEED
+        ========================= */
+
+        async function deleteFeed(id) {
+
+            try {
+
+                await fetch(`/api/feeds/${id}`, {
+
+                    method: "DELETE"
+                });
+
+                showNotification(
+                    "RSS kaynağı silindi"
+                );
+
+                loadFeeds();
+
+            } catch (error) {
+
+                console.log(error);
+            }
+        }
+
+
+        /* =========================
+           FETCH NEWS
+        ========================= */
+
+        async function fetchNews() {
+
+            showNotification(
+                "Haberler kontrol ediliyor..."
+            );
+
+            try {
+
+                await fetch("/fetch-news");
+
+            } catch (error) {
+
+                console.log(error);
+            }
+        }
+
+
+        /* =========================
+           TOAST
+        ========================= */
+
+        function showNotification(message) {
+
+            const toast =
+                document.createElement("div");
+
+            toast.className = "toast";
+
+            toast.innerText = message;
+
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+
+                toast.classList.add("show");
+
+            }, 100);
+
+            setTimeout(() => {
+
+                toast.classList.remove("show");
+
+                setTimeout(() => {
+
+                    toast.remove();
+
+                }, 300);
+
+            }, 3000);
+        }
+
+
+        /* =========================
+           AUTO REFRESH
+        ========================= */
+
+        setInterval(() => {
+
+            loadNews();
+
+        }, 30000);
+
+
+        /* =========================
+           INIT
+        ========================= */
+
+        loadNews();
+
+        loadFeeds();
+
+        loadLogs();
+
+    </script>
+
+</body>
+
+</html>
